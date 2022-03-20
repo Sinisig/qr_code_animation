@@ -1,0 +1,14 @@
+# Git stuff
+.git
+
+# Build Directories
+bin/
+
+# Intermediates / output
+*.o
+*.uu
+*.txt
+*.png
+
+# Workspace stuff
+*.code-workspace
