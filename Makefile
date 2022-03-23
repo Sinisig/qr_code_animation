@@ -27,7 +27,6 @@ OUT_TARGET	:= $(OUT_DIR)/$(OUT_NAME)
 DMP_TARGET	:= $(OUT_DIR)/$(OUT_NAME).txt
 
 # Build tools
-CC			:= gcc
 AS			:= nasm
 LD 			:= ld
 UU			:= uuencode
@@ -35,7 +34,6 @@ QE			:= qrencode
 DMP 		:= objdump
 
 # General build options
-CCFLAGS		:= -Wall -Werror -fno-stack-protector
 ASFLAGS		:= -f elf64
 LDFLAGS		:= -nostdlib -n -m elf_x86_64 -e _entry
 QEFLAGS		:= -t PNG -s 7 -8 --verbose
@@ -43,17 +41,14 @@ DMPFLAGS	:= -d
 
 # Option-specific build flags
 ifeq ($(DEBUG),0)
-	CCFLAGS	+= -Os -ffunction-sections -fdata-sections -DRELEASE
 	LDFLAGS += -Os -s --gc-sections
 else
-	CCFLAGS	+= -O0 -g -DDEBUG
 	ASFLAGS	+= -g
 	LDFLAGS += -g
 endif
 
 # Append include paths
-CCFLAGS 	+= $(foreach dir,$(INC_DIRS),-I $(dir))
-ASFLAGS 	+= $(foreach dir,$(INC_DIRS),-I $(dir))
+ASFLAGS += $(foreach dir,$(INC_DIRS),-I $(dir))
 
 
 #==- BUILD COMMANDS -==#
@@ -75,10 +70,7 @@ endif
 # Linking / binary output
 $(OUT_TARGET) : $(OBJ_DIRS) $(INT_LIST)
 	$(LD) $(LDFLAGS) -o $@ $(INT_LIST)
-
-# Compiling
-$(INT_DIR)/%.c.o : %.c
-	$(CC) $(CCFLAGS) -o $@ -c $<
+	wc -c $@
 
 # Assembling
 $(INT_DIR)/%.s.o : %.s

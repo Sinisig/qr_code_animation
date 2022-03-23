@@ -1,3 +1,8 @@
+;----------------------------------------;
+; init.s - Entrypoint of the application ;
+; Sinisig 2021-2022                      ;
+;----------------------------------------;
+
 %include "Shared.i"
 
 global _entry

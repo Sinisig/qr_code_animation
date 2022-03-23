@@ -1,18 +1,14 @@
+;--------------------------------------------;
+; main.s - Main function and loop processing ;
+; Sinisig 2022                               ;
+;--------------------------------------------;
+
 %include "Shared.i"
+%include "draw.i"
+%include "math.i"
 
-global main
 
-
-%define C_SIZE_X  43
-%define C_SIZE_Y  12
-%defstr C_SIZE_X_STR C_SIZE_X
-%defstr C_SIZE_Y_STR C_SIZE_Y
-
-C_BUFSZ  equ (C_SIZE_X*C_SIZE_Y) + C_SIZE_Y
-C_BG     equ ' '
-C_FG     equ '*'
-
-;==- Formatting strings --=;
+;==- Constant data -==;
 
 section .rodata
 strEscCursor:
@@ -24,109 +20,109 @@ strEscClear:
    db C_ESC,"[2J"
 strEscClearLen    equ $ - strEscClear
 
-;==- Display text -==;
-
 section .rodata
 strWatermark:
    db "#==- QR Code Animation by Sinisig 2022 -==#",C_LF
 strWatermarkLen   equ $ - strWatermark
 
-;==- Constant struct for sleep -==;
 section .rodata
-restData:
-   dq 0           ; tv_sec    : 0 seconds
-   dq 125000000   ; tv_nsec   : 0.125 seconds aka 1/8th of a seocnd
+fConst_dTheta:
+   dd 0.2
+
+;==- Code -==;
 
 section .text
-print_str: ; void print_str(const char * buf, int len)
-   mov   edx,esi
-   mov   rsi,rdi
-   xor   eax,eax
-   mov   al,SYS_WRITE
-   mov   edi,STDOUT
-   syscall
-   ret
-
-section .text
-clear_con:  ; void clear_con(void)
-   lea   rdi,[strEscClear]
-   mov   esi,strEscClearLen
-   jmp   print_str
-
-section .text
+global main
 main:
+   .SBUF_STRBUF   equ C_BUFSZ
+   .SBUF_TSTRUC   equ 16
+   .SBUF_TRI      equ 32
+   .SBUF_THETA    equ 16
+
+   .STACKSZ       equ .SBUF_TSTRUC+.SBUF_TRI+.SBUF_STRBUF+.SBUF_THETA
+   .SOFF_TSTRUC   equ .SBUF_TSTRUC
+   .SOFF_TRI      equ .SOFF_TSTRUC+.SBUF_TRI
+   .SOFF_THETA    equ .SOFF_TRI+.SBUF_THETA
+   .SOFF_STRBUF   equ .SOFF_THETA+.SBUF_STRBUF
+
    push  rbx
-   push  r13
+   push  r12
    push  rbp
    mov   rbp,rsp
-   sub   rsp,C_BUFSZ + (16 - (C_BUFSZ % 16)) ; Aligned to a 16-byte boundary
+   sub   rsp,.STACKSZ
+
+   ; Load the time interval struct on the stack
+   xor   eax,eax
+   mov   qword [rbp-.SOFF_TSTRUC+08h],1000000000/A_RATE
+   mov   qword [rbp-.SOFF_TSTRUC],rax
+
+   ; Base data for the triangle
+   mov   dword [rbp-.SOFF_THETA],eax
+   mov   dword [rbp-.SOFF_TRI+Tri.a+0],-7
+   mov   dword [rbp-.SOFF_TRI+Tri.a+4],3
+   mov   dword [rbp-.SOFF_TRI+Tri.b+0],-1
+   mov   dword [rbp-.SOFF_TRI+Tri.b+4],3
+   mov   dword [rbp-.SOFF_TRI+Tri.c+0],-4
+   mov   dword [rbp-.SOFF_TRI+Tri.c+4],0
+   mov   byte [rbp-.SOFF_TRI+Tri.fill],C_FG_SHADE0
+
+   ; Pointer for the screen/string buffer
+   lea   r12,[rbp-.SOFF_STRBUF]
 
    ; Clear the console and display the watermark text
-   call  clear_con
-   lea   rdi,[strWatermark]
-   mov   esi,strWatermarkLen
-   call  print_str
+   PRINTSTR strEscClear,strEscClearLen
+   PRINTSTR strWatermark,strWatermarkLen
 
-   ; Initialize the buffer
-   xor   eax,eax        ; Index into the buffer
-   mov   ecx,C_SIZE_Y   ; Count of Y cols
-
-   .loop_outer:
-   mov   edx,C_SIZE_X   ; Count of X cols
-
-   .loop_inner:
-   ; Fill row with the background char
-   mov   byte [rsp+rax],C_BG
-   inc   eax
-   dec   edx
-   jnz   .loop_inner
-
-   ; Tack on a newline and move to the next row
-   mov   byte [rsp+rax],C_LF
-   inc   eax
-   dec   ecx
-   jnz   .loop_outer
-   
-   ; Display the first frame of the animation
-   mov   rdi,rsp
-   mov   esi,C_BUFSZ
-   call  print_str
+   ; Show the first frame of the animation
+   mov      rdi,r12
+   call     clear_con
+   PRINTSTR r12,C_CHARCOUNT
 
    ; ==- Main animation loop -==;
-   mov   ebx,C_SIZE_X*C_SIZE_Y   ; Character counter
+
+   mov   ebx,A_LENGTH   ; Frame count
    .animate_loop:
-      ; Sleep for 1/8th of a second
-      lea   rdi,[restData]
+      ; Delay for frame timing
+      lea   rdi,[rbp-10h]
       xor   esi,esi
       xor   eax,eax
       mov   al,SYS_NANOSLEEP
       syscall
 
-      ; Update a random number
-      .pick_char:
-         ; Random index
-         rdrand   eax
-         mov      ecx,C_BUFSZ
-         xor      edx,edx
-         div      ecx
-         
-         ; Make sure it's free
-         mov      al,[rsp+rdx]
-         cmp      al,C_FG
-         je       .pick_char
-         cmp      al,C_LF
-         je       .pick_char
+      ; Clear the buffer for the new frame
+      mov   rdi,r12
+      call  clear_con
 
-         ; Write the foreground char
-         mov      byte [rsp+rdx],C_FG
+      ;==- Rendering code -==;
+
+      ; Update x-coord
+      inc   dword [rbp-.SOFF_TRI+Tri.a]
+      inc   dword [rbp-.SOFF_TRI+Tri.b]
+      inc   dword [rbp-.SOFF_TRI+Tri.c]
+
+      ; Update y-coord
+      movss    xmm0,[rbp-.SOFF_THETA]
+      call     sinf
+      cvtss2si eax,xmm0
+      add      dword [rbp-.SOFF_TRI+Tri.a+4],eax
+      add      dword [rbp-.SOFF_TRI+Tri.b+4],eax
+      add      dword [rbp-.SOFF_TRI+Tri.c+4],eax
+
+      ; Increment theta for the next loop
+      movss xmm0,[rbp-.SOFF_THETA]
+      addss xmm0,[fConst_dTheta]
+      movss [rbp-.SOFF_THETA],xmm0
+
+      ; Draw the triangle
+      mov   rdi,r12
+      lea   rsi,[rbp-.SOFF_TRI]
+      call  plot_triangle
+
+      ;==- End of rendering code -==;
 
       ; Display the buffer
-      lea   rdi,[strEscCursor]
-      mov   esi,strEscCursorLen
-      call  print_str
-      mov   rdi,rsp
-      mov   esi,C_BUFSZ
-      call  print_str
+      PRINTSTR strEscCursor,strEscCursorLen
+      PRINTSTR rsp,C_CHARCOUNT
 
       ; Do we keep looping?
       dec   ebx
@@ -135,6 +131,6 @@ main:
    ; Return successfully :D
    xor   eax,eax
    leave
-   pop   r13
+   pop   r12
    pop   rbx
    ret
