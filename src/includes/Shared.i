@@ -25,7 +25,7 @@ C_ESC       equ 1Bh
 ; Console Window Parameters
 ; These must be between 0 and 255
 %define  C_SIZE_X  43
-%define  C_SIZE_Y  12
+%define  C_SIZE_Y  13
 
 %defstr  C_SIZE_X_STR C_SIZE_X
 %defstr  C_SIZE_Y_STR C_SIZE_Y

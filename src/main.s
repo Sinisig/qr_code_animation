@@ -22,7 +22,8 @@ strEscClearLen    equ $ - strEscClear
 
 section .rodata
 strWatermark:
-   db "#==- QR Code Animation by Sinisig 2022 -==#",C_LF
+   db "#==-   QR Code Animation by Sinisig 2022  -==#",C_LF
+   db "#==- github.com/Sinisig/qr_code_animation -==#",C_LF
 strWatermarkLen   equ $ - strWatermark
 
 section .rodata
@@ -113,14 +114,14 @@ main:
          call     cosf
          mulss    xmm0,[fConst_axisScaleX]
          cvtss2si eax,xmm0
-         add      eax,C_SIZE_X/2
+         add      eax,(C_SIZE_X/2)+2
          mov      dword [r13+0],eax
          ; y
          movss    xmm0,[rbp-.SOFF_THETA]
          call     sinf
          mulss    xmm0,[fConst_axisScaleY]
          cvtss2si eax,xmm0
-         add      eax,C_SIZE_Y/2
+         add      eax,(C_SIZE_Y/2)+1
          mov      dword [r13+4],eax
          ; +60 degrees
          movss    xmm0,[rbp-.SOFF_THETA]
