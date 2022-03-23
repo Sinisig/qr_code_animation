@@ -26,6 +26,10 @@ strWatermark:
 strWatermarkLen   equ $ - strWatermark
 
 section .rodata
+shadingTable:
+   db C_FG_SHADE0,C_FG_SHADE1,C_FG_SHADE2,C_FG_SHADE3,C_FG_SHADE4
+
+section .rodata
 fConst_triIncRotate:
    dd 0x40060A92  ; 2pi/3 aka 60 degrees
 
@@ -70,11 +74,8 @@ main:
    mov   qword [rbp-.SOFF_TSTRUC+08h],1000000000/A_RATE
    mov   qword [rbp-.SOFF_TSTRUC],rax
 
-   ; Base data for the triangle
+   ; Pointer for the screen/string buffer and zero out theta
    mov   dword [rbp-.SOFF_THETA],eax
-   mov   byte [rbp-.SOFF_TRI+Tri.fill],C_FG_SHADE0
-
-   ; Pointer for the screen/string buffer
    lea   r12,[rbp-.SOFF_STRBUF]
 
    ; Clear the console and display the watermark text
@@ -136,6 +137,16 @@ main:
       movss xmm0,[rbp-.SOFF_THETA]
       addss xmm0,[fConst_thetaIncrement]
       movss [rbp-.SOFF_THETA],xmm0
+
+      ; Use theta to pick a new shade for the triangle
+      call     cosf
+      addss    xmm0,xmm0
+      cvtss2si eax,xmm0
+      inc      eax
+      lea      rdi,[shadingTable]
+      inc      eax
+      mov      dl,[rdi+rax]
+      mov      byte [rbp-.SOFF_TRI+Tri.fill],dl
 
       ; Draw the triangle
       mov   rdi,r12

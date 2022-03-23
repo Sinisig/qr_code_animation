@@ -35,9 +35,10 @@ C_BUFSZ             equ C_CHARCOUNT + (16 - (C_CHARCOUNT % 16)) ; Aligned to 16 
 C_BG                equ ' '
 C_FG_SHADE0         equ '#'
 C_FG_SHADE1         equ 'x'
-C_FG_SHADE2         equ '='
-C_FG_SHADE3         equ '.'
-C_FG_SHADE_COUNT    equ 4
+C_FG_SHADE2         equ 'o'
+C_FG_SHADE3         equ '='
+C_FG_SHADE4         equ '.'
+C_FG_SHADE_COUNT    equ 5
 
 ; Animation Parameters
 A_LENGTH equ 300  ; Frame count
