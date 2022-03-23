@@ -40,8 +40,8 @@ C_FG_SHADE3         equ '.'
 C_FG_SHADE_COUNT    equ 4
 
 ; Animation Parameters
-A_LENGTH equ 51 ; Frame count
-A_RATE   equ 8  ; Frame rate (fps)
+A_LENGTH equ 300  ; Frame count
+A_RATE   equ 30   ; Frame rate (fps)
 
 ;--------------;
 %endif

@@ -26,8 +26,20 @@ strWatermark:
 strWatermarkLen   equ $ - strWatermark
 
 section .rodata
-fConst_dTheta:
-   dd 0.2
+fConst_triIncRotate:
+   dd 0x40060A92  ; 2pi/3 aka 60 degrees
+
+section .rodata
+fConst_thetaIncrement:
+   dd 0.1
+
+section .rodata
+fConst_axisScaleX:
+   dd 8.8888889
+
+section .rodata
+fConst_axisScaleY:
+   dd 5.0
 
 ;==- Code -==;
 
@@ -47,6 +59,8 @@ main:
 
    push  rbx
    push  r12
+   push  r13
+   push  r14
    push  rbp
    mov   rbp,rsp
    sub   rsp,.STACKSZ
@@ -58,12 +72,6 @@ main:
 
    ; Base data for the triangle
    mov   dword [rbp-.SOFF_THETA],eax
-   mov   dword [rbp-.SOFF_TRI+Tri.a+0],-7
-   mov   dword [rbp-.SOFF_TRI+Tri.a+4],3
-   mov   dword [rbp-.SOFF_TRI+Tri.b+0],-1
-   mov   dword [rbp-.SOFF_TRI+Tri.b+4],3
-   mov   dword [rbp-.SOFF_TRI+Tri.c+0],-4
-   mov   dword [rbp-.SOFF_TRI+Tri.c+4],0
    mov   byte [rbp-.SOFF_TRI+Tri.fill],C_FG_SHADE0
 
    ; Pointer for the screen/string buffer
@@ -95,22 +103,38 @@ main:
 
       ;==- Rendering code -==;
 
-      ; Update x-coord
-      inc   dword [rbp-.SOFF_TRI+Tri.a]
-      inc   dword [rbp-.SOFF_TRI+Tri.b]
-      inc   dword [rbp-.SOFF_TRI+Tri.c]
+      ; Calculate the x/y coords using sin and cos
+      lea   r13,[rbp-.SOFF_TRI]
+      mov   r14b,3
+      .calc_points:
+         ; x
+         movss    xmm0,[rbp-.SOFF_THETA]
+         call     cosf
+         mulss    xmm0,[fConst_axisScaleX]
+         cvtss2si eax,xmm0
+         add      eax,C_SIZE_X/2
+         mov      dword [r13+0],eax
+         ; y
+         movss    xmm0,[rbp-.SOFF_THETA]
+         call     sinf
+         mulss    xmm0,[fConst_axisScaleY]
+         cvtss2si eax,xmm0
+         add      eax,C_SIZE_Y/2
+         mov      dword [r13+4],eax
+         ; +60 degrees
+         movss    xmm0,[rbp-.SOFF_THETA]
+         addss    xmm0,[fConst_triIncRotate]
+         movss    [rbp-.SOFF_THETA],xmm0
+         ; Loop
+         xor   eax,eax
+         mov   al,8
+         add   r13,rax
+         dec   r14b
+         jnz   .calc_points
 
-      ; Update y-coord
-      movss    xmm0,[rbp-.SOFF_THETA]
-      call     sinf
-      cvtss2si eax,xmm0
-      add      dword [rbp-.SOFF_TRI+Tri.a+4],eax
-      add      dword [rbp-.SOFF_TRI+Tri.b+4],eax
-      add      dword [rbp-.SOFF_TRI+Tri.c+4],eax
-
-      ; Increment theta for the next loop
+      ; Increment theta
       movss xmm0,[rbp-.SOFF_THETA]
-      addss xmm0,[fConst_dTheta]
+      addss xmm0,[fConst_thetaIncrement]
       movss [rbp-.SOFF_THETA],xmm0
 
       ; Draw the triangle
@@ -131,6 +155,8 @@ main:
    ; Return successfully :D
    xor   eax,eax
    leave
+   pop   r14
+   pop   r13
    pop   r12
    pop   rbx
    ret
