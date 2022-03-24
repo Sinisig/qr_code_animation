@@ -40,7 +40,7 @@ fConst_thetaIncrement:
 
 section .rodata
 fConst_axisScaleX:
-   dd 8.8888889
+   dd 11.429   ; 5*16/7
 
 section .rodata
 fConst_axisScaleY:
