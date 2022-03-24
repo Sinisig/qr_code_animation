@@ -7,12 +7,8 @@
 
 %ifndef MATH_S_IMPL
 ;=================;
-extern fConst_AbsMask
-extern fConst_hPi
-
-extern cosf
-extern sinf
-extern tanf
+extern cosf ; int cos(int theta)
+extern sinf ; int sin(int theta)
 ;=================;
 %endif
 

@@ -24,7 +24,7 @@ C_ESC       equ 1Bh
 
 ; Console Window Parameters
 ; These must be between 0 and 255
-%define  C_SIZE_X  43
+%define  C_SIZE_X  46
 %define  C_SIZE_Y  13
 
 %defstr  C_SIZE_X_STR C_SIZE_X
@@ -35,9 +35,9 @@ C_BUFSZ             equ C_CHARCOUNT + (16 - (C_CHARCOUNT % 16)) ; Aligned to 16 
 C_BG                equ ' '
 C_FG_SHADE0         equ '#'
 C_FG_SHADE1         equ 'x'
-C_FG_SHADE2         equ 'o'
-C_FG_SHADE3         equ '='
-C_FG_SHADE4         equ '-'
+C_FG_SHADE2         equ '='
+C_FG_SHADE3         equ '-'
+C_FG_SHADE4         equ '.'
 C_FG_SHADE_COUNT    equ 5
 
 ; Animation Parameters

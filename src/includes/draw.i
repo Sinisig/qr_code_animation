@@ -12,21 +12,20 @@
 %endmacro
 
 %macro POINTDATA 2
-   dq (%2 << 32) | %1
+   dd (%2 << 16) | %1
 %endmacro
 
 struc Tri
-   .a       resq 1
-   .b       resq 1
-   .c       resq 1
-   .fill    resb 1
+   .a       resd 1
+   .b       resd 1
+   .c       resd 1
 endstruc
 
 %ifndef DRAW_S_IMPL
 ;=================;
-extern print_str
-extern clear_con
-extern plot_triangle
+extern print_str     ; void print_str(const char * str, int length)
+extern clear_con     ; void clear_con(char * buf)
+extern plot_triangle ; void plot_triangle(char * buf, const Tri * t, char fillColor)
 ;=================;
 %endif
 

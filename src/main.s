@@ -53,7 +53,7 @@ global main
 main:
    .SBUF_STRBUF   equ C_BUFSZ
    .SBUF_TSTRUC   equ 16
-   .SBUF_TRI      equ 32
+   .SBUF_TRI      equ 16
    .SBUF_THETA    equ 16
 
    .STACKSZ       equ .SBUF_TSTRUC+.SBUF_TRI+.SBUF_STRBUF+.SBUF_THETA
@@ -114,23 +114,24 @@ main:
          call     cosf
          mulss    xmm0,[fConst_axisScaleX]
          cvtss2si eax,xmm0
-         add      eax,(C_SIZE_X/2)+2
-         mov      dword [r13+0],eax
+         add      ax,C_SIZE_X/2
+         mov      word [r13],ax
+         inc      r13
+         inc      r13
          ; y
          movss    xmm0,[rbp-.SOFF_THETA]
          call     sinf
          mulss    xmm0,[fConst_axisScaleY]
          cvtss2si eax,xmm0
-         add      eax,(C_SIZE_Y/2)+1
-         mov      dword [r13+4],eax
+         add      ax,C_SIZE_Y/2
+         mov      word [r13],ax
+         inc      r13
+         inc      r13
          ; +60 degrees
          movss    xmm0,[rbp-.SOFF_THETA]
          addss    xmm0,[fConst_triIncRotate]
          movss    [rbp-.SOFF_THETA],xmm0
          ; Loop
-         xor   eax,eax
-         mov   al,8
-         add   r13,rax
          dec   r14b
          jnz   .calc_points
 
@@ -147,7 +148,6 @@ main:
       lea      rdi,[shadingTable]
       inc      eax
       mov      dl,[rdi+rax]
-      mov      byte [rbp-.SOFF_TRI+Tri.fill],dl
 
       ; Draw the triangle
       mov   rdi,r12
