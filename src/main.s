@@ -28,26 +28,28 @@ strWatermarkLen   equ $ - strWatermark
 
 section .rodata
 testShape_VData:
+   .SCL equ 4
    ; Stored as: x,y,z
-   dw 128,58,0    ; Mouth - Point 1
-   dw 96,100,0    ; Mouth - Point 2
-   dw 0,128,0     ; Mouth - Point 3
-   dw -95,100,0   ; Mouth - Point 2
-   dw -127,58,0   ; Mouth - Point 4
-   dw 128,-72,0   ; Right Eye - Point 1
-   dw 64,-72,0    ; Right Eye - Point 2
-   dw 96,-128,0   ; Right Eye - Point 3
-   dw 96,-90,0    ; Right Eye - Point 4
-   dw 74,-104,0   ; Right Eye - Point 5
-   dw 118,-104,0  ; Right Eye - Point 6
-   dw -127,-72,0   ; Left Eye - Point 1
-   dw -63,-72,0    ; Left Eye - Point 2
-   dw -95,-128,0   ; Left Eye - Point 3
-   dw -95,-90,0    ; Left Eye - Point 4
-   dw -73,-104,0   ; Left Eye - Point 5
-   dw -117,-104,0  ; Left Eye - Point 6
+   dw .SCL*128    ,.SCL*58    ,.SCL*0  ; Mouth - Point 1
+   dw .SCL*96     ,.SCL*100   ,.SCL*0  ; Mouth - Point 2
+   dw .SCL*0      ,.SCL*128   ,.SCL*0  ; Mouth - Point 3
+   dw .SCL*-95    ,.SCL*100   ,.SCL*0  ; Mouth - Point 2
+   dw .SCL*-127   ,.SCL*58    ,.SCL*0  ; Mouth - Point 4
+   dw .SCL*128    ,.SCL*-72   ,.SCL*0  ; Right Eye - Point 1
+   dw .SCL*64     ,.SCL*-72   ,.SCL*0  ; Right Eye - Point 2
+   dw .SCL*96     ,.SCL*-128  ,.SCL*0  ; Right Eye - Point 3
+   dw .SCL*96     ,.SCL*-90   ,.SCL*0  ; Right Eye - Point 4
+   dw .SCL*74     ,.SCL*-104  ,.SCL*0  ; Right Eye - Point 5
+   dw .SCL*118    ,.SCL*-104  ,.SCL*0  ; Right Eye - Point 6
+   dw .SCL*-127   ,.SCL*-72   ,.SCL*0  ; Left Eye - Point 1
+   dw .SCL*-63    ,.SCL*-72   ,.SCL*0  ; Left Eye - Point 2
+   dw .SCL*-95    ,.SCL*-128  ,.SCL*0  ; Left Eye - Point 3
+   dw .SCL*-95    ,.SCL*-90   ,.SCL*0  ; Left Eye - Point 4
+   dw .SCL*-73    ,.SCL*-104  ,.SCL*0  ; Left Eye - Point 5
+   dw .SCL*-117   ,.SCL*-104  ,.SCL*0  ; Left Eye - Point 6
 
-testShape_VCount  equ ($-testShape_VData)/6
+testShape_VSize   equ $-testShape_VData
+testShape_VCount  equ testShape_VSize/6
 
 section .rodata
 testShape_IData:
@@ -72,10 +74,12 @@ global main
 main:
    .SBUF_STRBUF   equ C_BUFSZ
    .SBUF_TSTRUC   equ 16
+   .SBUF_VERTBUF  equ testShape_VSize + (16 - (testShape_VSize % 16))
 
-   .STACKSZ       equ .SBUF_TSTRUC+.SBUF_STRBUF
-   .SOFF_TSTRUC   equ .SBUF_TSTRUC
-   .SOFF_STRBUF   equ .SOFF_TSTRUC+.SBUF_STRBUF
+   .STACKSZ       equ .SBUF_TSTRUC+.SBUF_STRBUF+.SBUF_VERTBUF
+   .SOFF_TSTRUC   equ 0
+   .SOFF_VERTBUF  equ .SBUF_TSTRUC
+   .SOFF_STRBUF   equ .SOFF_VERTBUF+.SBUF_VERTBUF
 
    %macro PRINTSTR 2
       lea   rdi,[%1]
@@ -86,16 +90,20 @@ main:
    push  rbx
    push  r12
    push  r13
-   push  r14
-   push  rbp
-   mov   rbp,rsp
    sub   rsp,.STACKSZ
 
-   ; Load the time interval struct on the stack and the string ptr
+   ; Load the time interval struct on the stack and the ptrs
    xor   eax,eax
-   lea   r12,[rbp-.SOFF_STRBUF]
-   mov   qword [rbp-.SOFF_TSTRUC+08h],1000000000/A_RATE
-   mov   qword [rbp-.SOFF_TSTRUC],rax
+   lea   r12,[rsp+.SOFF_STRBUF]
+   lea   r13,[rsp+.SOFF_VERTBUF]
+   mov   qword [rsp+.SOFF_TSTRUC+08h],1000000000/A_RATE
+   mov   qword [rsp+.SOFF_TSTRUC],rax
+
+   ; Initialize the vertex buffer
+   mov   ecx,testShape_VSize
+   lea   rsi,[testShape_VData]
+   mov   rdi,r13
+   rep   movsb
 
    ; Clear the console and display the watermark text
    PRINTSTR strEscClear,strEscClearLen
@@ -111,7 +119,7 @@ main:
    mov   ebx,A_LENGTH   ; Frame count
    .animate_loop:
       ; Delay for frame timing
-      lea   rdi,[rbp-10h]
+      lea   rdi,[rsp+.SOFF_TSTRUC]
       xor   esi,esi
       xor   eax,eax
       mov   al,SYS_NANOSLEEP
@@ -123,19 +131,31 @@ main:
 
       ;==- Rendering code -==;
       
+      ; Run the test translation over every coordinate
+      mov   rdi,r13
+      mov   ecx,testShape_VCount*3
+      .scale_shape:
+         mov   ax,word [rdi]
+         imul  ax,63
+         sar   ax,6
+         mov   word [rdi],ax
+         inc   rdi
+         inc   rdi
+         loop  .scale_shape
+
       ; Draw the test shape
       xor   ecx,ecx
       mov   rdi,r12
-      lea   rsi,[testShape_VData]
+      mov   rsi,r13
       lea   rdx,[testShape_IData]
-      mov   cl,testShape_ICount
+      mov   cl,testShape_ICount-1
       call  render_shape
 
       ;==- End of rendering code -==;
 
       ; Display the buffer
       PRINTSTR strEscCursor,strEscCursorLen
-      PRINTSTR rsp,C_CHARCOUNT
+      PRINTSTR r12,C_CHARCOUNT
 
       ; Do we keep looping?
       dec   ebx
@@ -143,8 +163,7 @@ main:
 
    ; Return successfully :D
    xor   eax,eax
-   leave
-   pop   r14
+   add   rsp,.STACKSZ
    pop   r13
    pop   r12
    pop   rbx

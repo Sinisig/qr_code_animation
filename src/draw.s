@@ -101,7 +101,9 @@ plot_triangle: ; void plot_triangle(char * buf, const Triangle2D * t, char fillC
       mov   edx,r10d
       call  .tri_area
 
-      ; Is the area the same?
+      ; Is the area the same and non-zero?
+      test  ebx,ebx
+      jz    .skip_fill
       cmp   ebp,ebx
       jne   .skip_fill
 
@@ -242,7 +244,6 @@ render_shape:
    mov   qword [rsp+.SOFF_VBUF],rsi ; vBuf
    mov   qword [rsp+.SOFF_BUF],rdi  ; buf
 
-   dec   ebx
    .plot_loop:
    ; Load in the next triangle
    mov   rsi,qword [rsp+.SOFF_VBUF]
@@ -270,6 +271,7 @@ render_shape:
    call  plot_triangle
    xor   eax,eax
    mov   al,3
+   .skip_plot:
    sub   ebx,eax
    jge   .plot_loop
 
