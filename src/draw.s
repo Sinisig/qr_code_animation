@@ -11,7 +11,7 @@
 
 section  .text
 global   print_str
-print_str: ; void print_str(const char * buf, int len)
+print_str: ; void print_str(const char * buf, u32 len)
    xor   eax,eax
    mov   edx,esi
    mov   rsi,rdi
@@ -40,7 +40,7 @@ clear_con:  ; void clear_con(char * buf)
 
 section  .text
 global   plot_triangle
-plot_triangle: ; void plot_triangle(char * buf, const Tri * t, char fillColor)
+plot_triangle: ; void plot_triangle(char * buf, const Triangle2D * t, char fillColor)
    push  rbx
    push  rbp
    push  r12
@@ -58,7 +58,7 @@ plot_triangle: ; void plot_triangle(char * buf, const Tri * t, char fillColor)
    add   rsi,rax
    mov   r9d,dword [rsi]
    add   rsi,rax
-   mov   r10d,dword [rsi]  ; r8d = Tri.a, r9d = Tri.b, r10d = Tri.c
+   mov   r10d,dword [rsi]  ; r8d = Triangle2D.a, r9d = Triangle2D.b, r10d = Triangle2D.c
    xor   ebx,ebx
    xor   r12d,r12d
    xor   r13d,r13d
@@ -190,4 +190,145 @@ plot_triangle: ; void plot_triangle(char * buf, const Tri * t, char fillColor)
    pop   rbx
    add   ebx,ebp
    pop   rbp
+   ret
+
+section  .text
+global   render_shape ; void render_shape(char * buf, const Point3D * vBuf, const u8 * iBuf, u32 iCount)
+render_shape:
+   ; This function takes in a list of vertices and
+   ; indexes into the vertex list to construct a shape.
+   ; 
+   ; A shape is created by loading in 3 indices from
+   ; the index buffer, and using those as offsets into
+   ; the vertex buffer to form a triangle.
+   ;
+   ; Vertex positions are converted into screen coordinates
+   ; by multiplying x and y coordinates by their scale factor,
+   ; then adding half of C_SIZE_X/Y to the x/y coordinates.
+   ; 
+   ; In the future, this function will also run the projection
+   ; code to allow for 3D triangles.  The color will also depend
+   ; on the triangle's angle to the screen.
+
+   %macro LOAD_VERTEX 1
+      call  .load_vertex
+      mov   %1,rax
+   %endmacro
+
+   %macro CONVERT_WORLD_COORD 1
+      mov   eax,%1
+      call  .convert_world_coord
+   %endmacro
+
+   .SBUF_DRAWTRI  equ 16
+   .SBUF_VBUF     equ 8
+   .SBUF_BUF      equ 8
+
+   .STACKSZ       equ .SBUF_DRAWTRI+.SBUF_VBUF+.SBUF_BUF
+   .SOFF_DRAWTRI  equ 0
+   .SOFF_VBUF     equ .SBUF_DRAWTRI
+   .SOFF_BUF      equ .SOFF_VBUF+.SBUF_VBUF
+
+   push  rbx
+   push  r12
+   push  r13
+   push  r14
+   push  r15
+   sub   rsp,.SOFF_DRAWTRI
+
+   ; Initialize base registers and store data
+   mov   ebx,ecx                    ; iCount
+   mov   r12,rdx                    ; iBuf
+   mov   qword [rsp+.SOFF_VBUF],rsi ; vBuf
+   mov   qword [rsp+.SOFF_BUF],rdi  ; buf
+
+   dec   ebx
+   .plot_loop:
+   ; Load in the next triangle
+   mov   rsi,qword [rsp+.SOFF_VBUF]
+   LOAD_VERTEX r13
+   LOAD_VERTEX r14
+   LOAD_VERTEX r15
+
+   ; TODO: Run the orthographic projection to get the
+   ; 2D world coordinates and get the angle of the
+   ; triangle to the camera to get the triangle shade
+   mov   r8d,r13d
+   mov   r9d,r14d
+   mov   r10d,r15d
+   mov   dl,C_FG_SHADE0
+
+   ; Convert form world coords to screen coords and store the result
+   lea   rdi,[rsp+.SOFF_DRAWTRI]
+   CONVERT_WORLD_COORD  r8d
+   CONVERT_WORLD_COORD  r9d
+   CONVERT_WORLD_COORD  r10d
+
+   ; Print the triangle and loop
+   mov   rdi,qword [rsp+.SOFF_BUF]
+   lea   rsi,[rsp+.SOFF_DRAWTRI]
+   call  plot_triangle
+   xor   eax,eax
+   mov   al,3
+   sub   ebx,eax
+   jge   .plot_loop
+
+   add   rsp,.SOFF_DRAWTRI
+   pop   r15
+   pop   r14
+   pop   r13
+   pop   r12
+   pop   rbx
+   ret
+
+   .load_vertex:
+   ; Subroutine that loads in a vertex and increments the pointer
+   ; rsi = Pointer to the vBuf
+   ; Output is in rax
+   movzx eax,byte [r12]
+   inc   r12
+   lea   rcx,[rax+rax*4]
+   add   rcx,rax  ; offset*6
+   mov   dx,word [rsi+rcx+4]
+   mov   eax,dword [rsi+rcx]
+   shl   rdx,32
+   or    rax,rdx
+   ret
+
+   .convert_world_coord:
+   ; Subroutine that converts an input Point2D to screen coordinates and stores the result
+   ; eax = input
+   ; rdi = output pointer
+   mov   ecx,eax
+   shr   ecx,16
+   
+   ; Transformation:
+   ; World-coord range:
+   ;     x = [-127,128]
+   ;     y = [-127,128]
+   ; Screen-coord range:
+   ;     x = [0,C_SIZE_X-1]
+   ;     y = [0,C_SIZE_Y-1]
+   ; 
+   ; Also need to account for the aspect ratio
+   ; of the screen and each pixel (which is 2)
+   ; 
+   ; Formula for converting:
+   ; screen-space x = (x*(C_SIZE_X-1)/256) + C_SIZE_X)/2
+   ; screen-space y = y*(C_SIZE_Y-1)/256 + (C_SIZE_Y/2)
+
+   imul  ax,C_SIZE_X-1
+   sar   ax,9
+   imul  cx,C_SIZE_Y-1
+   add   ax,C_SIZE_X/2
+   sar   cx,8
+   add   cx,C_SIZE_Y/2
+
+   ; Store the result and increment the pointer
+   shl   ecx,16
+   mov   cx,ax
+   xor   eax,eax
+   mov   dword [rdi],ecx
+   mov   al,4
+   add   rdi,rax
    ret
