@@ -44,5 +44,11 @@ C_FG_SHADE_COUNT    equ 5
 A_LENGTH equ 300  ; Frame count
 A_RATE   equ 30   ; Frame rate (fps)
 
+A_CAM_DEF_PITCH     equ 28672   ; Default camera pitch
+A_CAM_DEF_YAW       equ 0       ; Default camera yaw
+A_CAM_DEF_ROLL      equ 0       ; Default camera roll
+A_CAM_DEF_HEIGHT    equ 128     ; Default camera height
+A_CAM_YAW_INCREMENT equ 1092    ; Rotation amount per frame
+
 ;--------------;
 %endif

@@ -7,8 +7,8 @@
 
 %ifndef MATH_S_IMPL
 ;=================;
-extern cosf ; int cos(int theta)
-extern sinf ; int sin(int theta)
+extern cos  ; u16 cos(u16 theta)
+extern sin  ; u16 sin(u16 theta)
 ;=================;
 %endif
 

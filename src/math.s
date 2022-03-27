@@ -8,32 +8,38 @@
 %include "math.i"
 
 
-;==- Constants -==;
+section .rodata
+fConst_outputRange:
+   dd 32768.0
 
-section 	.rodata
-global	fConst_hPi
-fConst_hPi:
-	dd 0x3FC90FDB
-
-;==- Trig Functions -==;
+section .rodata
+fConst_cvtToRad:
+   dd 0x38C90FDB  ; pi/32768
 
 section	.text
-global 	cosf
-cosf:
-	.STACKSZ		equ 8
-	.SOFF_BUF	equ 0
+global 	cos
+cos:
+   .SBUF_FLOAT equ 4
 
-	sub	rsp,.STACKSZ
-	movss	[rsp+.SOFF_BUF],xmm0
-	fld	dword [rsp+.SOFF_BUF]
-	fcos
-	fstp	dword [rsp+.SOFF_BUF]
-	movss	xmm0,dword [rsp+.SOFF_BUF]
-	add	rsp,.STACKSZ
+   .STACKSZ    equ .SBUF_FLOAT
+   .SOFF_FLOAT equ 0
+
+   sub      rsp,.STACKSZ
+   movzx    eax,ax
+   cvtsi2ss xmm0,eax
+   mulss    xmm0,[fConst_cvtToRad]
+   movss    dword [rsp+.SOFF_FLOAT],xmm0
+   fld      dword [rsp+.SOFF_FLOAT]
+   fcos
+   fstp     dword [rsp+.SOFF_FLOAT]
+   movss    xmm0,dword [rsp+.SOFF_FLOAT]
+   mulss    xmm0,[fConst_outputRange]
+	cvtss2si eax,xmm0
+   add      rsp,.STACKSZ
 	ret
 
 section	.text
-global	sinf
-sinf:
-	subss	xmm0,[fConst_hPi]
-	jmp	cosf
+global	sin
+sin:
+	sub   ax,16384
+	jmp   cos

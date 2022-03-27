@@ -195,7 +195,7 @@ plot_triangle: ; void plot_triangle(char * buf, const Triangle2D * t, char fillC
    ret
 
 section  .text
-global   render_shape ; void render_shape(char * buf, const Point3D * vBuf, const u8 * iBuf, u32 iCount)
+global   render_shape ; void render_shape(char * buf, const Camera * cam, const Point3D * vBuf, const u8 * iBuf, u32 iCount)
 render_shape:
    ; This function takes in a list of vertices and
    ; indexes into the vertex list to construct a shape.
@@ -223,12 +223,14 @@ render_shape:
    %endmacro
 
    .SBUF_DRAWTRI  equ 16
+   .SBUF_CAMERA   equ 8
    .SBUF_VBUF     equ 8
    .SBUF_BUF      equ 8
 
-   .STACKSZ       equ .SBUF_DRAWTRI+.SBUF_VBUF+.SBUF_BUF
+   .STACKSZ       equ .SBUF_DRAWTRI+.SBUF_VBUF+.SBUF_BUF+8
    .SOFF_DRAWTRI  equ 0
-   .SOFF_VBUF     equ .SBUF_DRAWTRI
+   .SOFF_CAMERA   equ .SBUF_DRAWTRI
+   .SOFF_VBUF     equ .SOFF_CAMERA+.SBUF_CAMERA
    .SOFF_BUF      equ .SOFF_VBUF+.SBUF_VBUF
 
    push  rbx
@@ -236,13 +238,14 @@ render_shape:
    push  r13
    push  r14
    push  r15
-   sub   rsp,.SOFF_DRAWTRI
+   sub   rsp,.STACKSZ
 
    ; Initialize base registers and store data
-   mov   ebx,ecx                    ; iCount
-   mov   r12,rdx                    ; iBuf
-   mov   qword [rsp+.SOFF_VBUF],rsi ; vBuf
-   mov   qword [rsp+.SOFF_BUF],rdi  ; buf
+   mov   ebx,r8d                       ; iCount
+   mov   r12,rcx                       ; iBuf
+   mov   qword [rsp+.SOFF_VBUF],rdx    ; vBuf
+   mov   qword [rsp+.SOFF_CAMERA],rsi  ; cam
+   mov   qword [rsp+.SOFF_BUF],rdi     ; buf
 
    .plot_loop:
    ; Load in the next triangle
@@ -261,9 +264,9 @@ render_shape:
 
    ; Convert form world coords to screen coords and store the result
    lea   rdi,[rsp+.SOFF_DRAWTRI]
-   CONVERT_WORLD_COORD  r8d
-   CONVERT_WORLD_COORD  r9d
-   CONVERT_WORLD_COORD  r10d
+   CONVERT_WORLD_COORD r8d
+   CONVERT_WORLD_COORD r9d
+   CONVERT_WORLD_COORD r10d
 
    ; Print the triangle and loop
    mov   rdi,qword [rsp+.SOFF_BUF]
@@ -275,7 +278,7 @@ render_shape:
    sub   ebx,eax
    jge   .plot_loop
 
-   add   rsp,.SOFF_DRAWTRI
+   add   rsp,.STACKSZ
    pop   r15
    pop   r14
    pop   r13
