@@ -21,24 +21,6 @@ print_str: ; void print_str(const char * buf, u32 len)
    ret
 
 section  .text
-global   clear_con
-clear_con:  ; void clear_con(char * buf)
-   xor   ecx,ecx
-   mov   al,C_BG
-   mov   dl,C_SIZE_Y
-   .clear_row:
-      mov   cl,C_SIZE_X
-      rep   stosb
-      
-      ; Line Ending
-      mov   byte [rdi],C_LF
-      inc   rdi
-      dec   dl
-      jnz   .clear_row
-   
-   ret
-
-section  .text
 global   plot_triangle
 plot_triangle: ; void plot_triangle(char * buf, const Triangle2D * t, char fillColor)
    push  rbx

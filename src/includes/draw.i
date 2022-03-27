@@ -39,7 +39,6 @@ endstruc
 %ifndef DRAW_S_IMPL
 ;=================;
 extern print_str     ; void print_str(const char * str, u32 length)
-extern clear_con     ; void clear_con(char * buf)
 extern plot_triangle ; void plot_triangle(char * buf, const Triangle2D * t, char fillColor)
 extern render_shape  ; void render_shape(char * buf, const Camera * cam, const Point3D * vBuf, const u8 * iBuf, u32 iCount)
 ;=================;

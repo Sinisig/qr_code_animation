@@ -23,13 +23,8 @@ C_LF        equ 0Ah
 C_ESC       equ 1Bh
 
 ; Console Window Parameters
-; These must be between 0 and 255
-%define  C_SIZE_X  46
-%define  C_SIZE_Y  13
-
-%defstr  C_SIZE_X_STR C_SIZE_X
-%defstr  C_SIZE_Y_STR C_SIZE_Y
-
+C_SIZE_X            equ 46  ; Should be less than 255
+C_SIZE_Y            equ 13  ; Should be less than 255
 C_CHARCOUNT         equ (C_SIZE_X*C_SIZE_Y) + C_SIZE_Y
 C_BUFSZ             equ C_CHARCOUNT + (16 - (C_CHARCOUNT % 16)) ; Aligned to 16 bytes
 C_BG                equ ' '

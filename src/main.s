@@ -11,17 +11,14 @@
 ;==- Constant data -==;
 
 section .rodata
-strEscCursor:
-   db C_ESC,"[",C_SIZE_X_STR,"D",C_ESC,"[",C_SIZE_Y_STR,"A"
-strEscCursorLen   equ $ - strEscCursor
-
-section .rodata
-strEscClear:
-   db C_ESC,"[2J"
-strEscClearLen    equ $ - strEscClear
+strResetCursor:
+   db C_ESC,"[3H"
+strResetCursorLen equ $ - strResetCursor
 
 section .rodata
 strWatermark:
+   db C_ESC,"[2J" ; Clear the console
+   db C_ESC,"[H"  ; Move the cursor to the top-left
    db "#==-   QR Code Animation by Sinisig 2022  -==#",C_LF
    db "#==- github.com/Sinisig/qr_code_animation -==#",C_LF
 strWatermarkLen   equ $ - strWatermark
@@ -97,29 +94,25 @@ main:
    mov   word [r13+Camera.yaw],  A_CAM_DEF_YAW
    mov   word [r13+Camera.roll], A_CAM_DEF_ROLL
 
-   ; Clear the console and display the watermark text
-   PRINTSTR strEscClear,strEscClearLen
+   ; Display the watermark text and prepare the console
    PRINTSTR strWatermark,strWatermarkLen
-
-   ; Show the first frame of the animation
-   mov      rdi,r12
-   call     clear_con
-   PRINTSTR r12,C_CHARCOUNT
 
    ; ==- Main animation loop -==;
 
    mov   ebx,A_LENGTH   ; Frame count
    .animate_loop:
-      ; Delay for frame timing
-      lea   rdi,[rsp+.SOFF_TSTRUC]
-      xor   esi,esi
-      xor   eax,eax
-      mov   al,SYS_NANOSLEEP
-      syscall
-
       ; Clear the buffer for the new frame
+      xor   ecx,ecx
       mov   rdi,r12
-      call  clear_con
+      mov   al,C_BG
+      mov   dl,C_SIZE_Y
+      .clear_row:
+         mov   cl,C_SIZE_X
+         rep   stosb
+         mov   byte [rdi],C_LF
+         inc   rdi
+         dec   dl
+         jnz   .clear_row
 
       ;==- Rendering code -==;
       
@@ -148,8 +141,15 @@ main:
       ;==- End of rendering code -==;
 
       ; Display the buffer
-      PRINTSTR strEscCursor,strEscCursorLen
+      PRINTSTR strResetCursor,strResetCursorLen
       PRINTSTR r12,C_CHARCOUNT
+
+      ; Delay for frame timing
+      lea   rdi,[rsp+.SOFF_TSTRUC]
+      xor   esi,esi
+      xor   eax,eax
+      mov   al,SYS_NANOSLEEP
+      syscall
 
       ; Do we keep looping?
       dec   ebx
