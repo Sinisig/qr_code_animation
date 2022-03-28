@@ -24,37 +24,45 @@ strWatermark:
 strWatermarkLen   equ $ - strWatermark
 
 section .rodata
-mCuboid_VData:
-   .SCL equ 64
+mSmile_VData:
+   .SCL equ 4
    ; Stored as: x,y,z
-   dw 1-.SCL, 1-.SCL, .SCL
-   dw 1-.SCL, .SCL,   .SCL
-   dw .SCL,   .SCL,   .SCL
-   dw .SCL,   1-.SCL, .SCL
-   dw 1-.SCL, 1-.SCL, 1-.SCL
-   dw 1-.SCL, .SCL,   1-.SCL
-   dw .SCL,   .SCL,   1-.SCL
-   dw .SCL,   1-.SCL, 1-.SCL
+   dw .SCL*128    ,.SCL*58    ,.SCL*0  ; Mouth - Point 1
+   dw .SCL*96     ,.SCL*100   ,.SCL*0  ; Mouth - Point 2
+   dw .SCL*0      ,.SCL*128   ,.SCL*0  ; Mouth - Point 3
+   dw .SCL*-95    ,.SCL*100   ,.SCL*0  ; Mouth - Point 2
+   dw .SCL*-127   ,.SCL*58    ,.SCL*0  ; Mouth - Point 4
+   dw .SCL*128    ,.SCL*-72   ,.SCL*0  ; Right Eye - Point 1
+   dw .SCL*64     ,.SCL*-72   ,.SCL*0  ; Right Eye - Point 2
+   dw .SCL*96     ,.SCL*-128  ,.SCL*0  ; Right Eye - Point 3
+   dw .SCL*96     ,.SCL*-90   ,.SCL*0  ; Right Eye - Point 4
+   dw .SCL*74     ,.SCL*-104  ,.SCL*0  ; Right Eye - Point 5
+   dw .SCL*118    ,.SCL*-104  ,.SCL*0  ; Right Eye - Point 6
+   dw .SCL*-127   ,.SCL*-72   ,.SCL*0  ; Left Eye - Point 1
+   dw .SCL*-63    ,.SCL*-72   ,.SCL*0  ; Left Eye - Point 2
+   dw .SCL*-95    ,.SCL*-128  ,.SCL*0  ; Left Eye - Point 3
+   dw .SCL*-95    ,.SCL*-90   ,.SCL*0  ; Left Eye - Point 4
+   dw .SCL*-73    ,.SCL*-104  ,.SCL*0  ; Left Eye - Point 5
+   dw .SCL*-117   ,.SCL*-104  ,.SCL*0  ; Left Eye - Point 6
 
-mCuboid_VSize  equ $-mCuboid_VData
-mCuboid_VCount equ mCuboid_VSize/6
+mSmile_VSize   equ $-mSmile_VData
+mSmile_VCount  equ mSmile_VSize/6
 
 section .rodata
-mCuboid_IData:
-   db 0,1,2
-   db 0,2,3
-   db 4,5,6
-   db 4,6,7
-   db 0,3,7
-   db 0,4,7
-   db 1,2,6
-   db 1,5,6
-   db 0,1,4
-   db 1,4,5
-   db 2,3,7
-   db 2,6,7
+mSmile_IData:
+   db 0,1,2    ; Mouth - Tri 1
+   db 0,2,3    ; Mouth - Tri 2
+   db 0,3,4    ; Mouth - Tri 3
+   db 5,7,8    ; Right Eye - Tri 1
+   db 6,7,8    ; Right Eye - Tri 2
+   db 5,7,9    ; Right Eye - Tri 3
+   db 6,7,10   ; Right Eye - Tri 4
+   db 11,13,14 ; Left Eye - Tri 1
+   db 12,13,14 ; Left Eye - Tri 2
+   db 11,13,15 ; Left Eye - Tri 3
+   db 12,13,16 ; Left Eye - Tri 4
 
-mCuboid_ICount equ $-mCuboid_IData
+mSmile_ICount equ $-mSmile_IData
 
 ;==- Code -==;
 
@@ -64,11 +72,13 @@ main:
    .SBUF_STRBUF   equ C_BUFSZ
    .SBUF_TSTRUC   equ 16
    .SBUF_CAMERA   equ 16
+   .SBUF_VERTEX   equ mSmile_VSize+(16 - (mSmile_VSize % 16))
 
-   .STACKSZ       equ .SBUF_TSTRUC+.SBUF_STRBUF+.SBUF_CAMERA
+   .STACKSZ       equ .SBUF_TSTRUC+.SBUF_STRBUF+.SBUF_CAMERA+.SBUF_VERTEX+8
    .SOFF_TSTRUC   equ 0
    .SOFF_CAMERA   equ .SBUF_TSTRUC
-   .SOFF_STRBUF   equ .SOFF_CAMERA+.SBUF_CAMERA
+   .SOFF_VERTEX   equ .SOFF_CAMERA+.SBUF_CAMERA
+   .SOFF_STRBUF   equ .SOFF_VERTEX+.SBUF_VERTEX
 
    %macro PRINTSTR 2
       lea   rdi,[%1]
@@ -79,14 +89,22 @@ main:
    push  rbx
    push  r12
    push  r13
+   push  r14
    sub   rsp,.STACKSZ
 
    ; Load the time interval struct on the stack and the ptrs
    xor   eax,eax
    lea   r12,[rsp+.SOFF_STRBUF]
    lea   r13,[rsp+.SOFF_CAMERA]
+   lea   r14,[rsp+.SOFF_VERTEX]
    mov   qword [rsp+.SOFF_TSTRUC+08h],1000000000/A_RATE
    mov   qword [rsp+.SOFF_TSTRUC],rax
+
+   ; Load the smiley into the vertex buffer
+   mov   ecx,mSmile_VSize/2
+   lea   rsi,[mSmile_VData]
+   mov   rdi,r14
+   rep   movsw
 
    ; Initialize the camera angles and y-coordinate
    mov   byte [r13+Camera.y],    A_CAM_DEF_HEIGHT
@@ -129,13 +147,28 @@ main:
       sub   al,127
       mov   byte [r13+Camera.z],al
 
-      ; Render the cuboid
+      ; Scale down the smile
+      mov   ecx,mSmile_VSize/2
+      mov   rdi,r14
+      .scale_loop:
+         mov   ax,word [rdi]  ; Current coordinate in ax
+
+         ; Scale by a factor of 63/64 (98.4%)
+         imul  ax,63
+         sar   ax,6
+
+         mov   word [rdi],ax
+         inc   rdi
+         inc   rdi
+         loop  .scale_loop
+
+      ; Render the smile
       xor   r8d,r8d
       mov   rdi,r12
       mov   rsi,r13
-      lea   rdx,[mCuboid_VData]
-      lea   rcx,[mCuboid_IData]
-      mov   r8b,mCuboid_ICount-1
+      mov   rdx,r14
+      lea   rcx,[mSmile_IData]
+      mov   r8b,mSmile_ICount-1
       call  render_shape
 
       ;==- End of rendering code -==;
@@ -158,6 +191,7 @@ main:
    ; Return successfully :D
    xor   eax,eax
    add   rsp,.STACKSZ
+   pop   r14
    pop   r13
    pop   r12
    pop   rbx
