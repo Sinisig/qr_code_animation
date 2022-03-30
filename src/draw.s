@@ -239,6 +239,11 @@ render_shape:
    ; TODO: Run the orthographic projection to get the
    ; 2D world coordinates and get the angle of the
    ; triangle to the camera to get the triangle shade
+   ; 
+   ; Another TODO: Once this is implemented, the triangles
+   ; need to be sorted from back to front in order to get
+   ; the proper rendering order.  Have fun implementing this
+   ; in ASM >:)
    mov   r8d,r13d
    mov   r9d,r14d
    mov   r10d,r15d

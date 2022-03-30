@@ -45,5 +45,8 @@ A_CAM_DEF_ROLL      equ 0       ; Default camera roll
 A_CAM_DEF_HEIGHT    equ 128     ; Default camera height
 A_CAM_YAW_INCREMENT equ 1092    ; Rotation amount per frame
 
+; Should we include new, experimental code?
+%define D_EXPERIMENTAL   0
+
 ;--------------;
 %endif

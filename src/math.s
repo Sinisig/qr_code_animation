@@ -8,6 +8,9 @@
 %include "math.i"
 
 
+%if D_EXPERIMENTAL
+;----------------;
+
 section .rodata
 fConst_outputRange:
    dd 32768.0
@@ -43,3 +46,6 @@ global	sin
 sin:
 	sub   ax,16384
 	jmp   cos
+
+;----------------;
+%endif

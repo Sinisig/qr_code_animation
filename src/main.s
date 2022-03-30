@@ -95,7 +95,11 @@ main:
    ; Load the time interval struct on the stack and the ptrs
    xor   eax,eax
    lea   r12,[rsp+.SOFF_STRBUF]
+   %if   D_EXPERIMENTAL
+   ;------------------;
    lea   r13,[rsp+.SOFF_CAMERA]
+   ;------------------;
+   %endif
    lea   r14,[rsp+.SOFF_VERTEX]
    mov   qword [rsp+.SOFF_TSTRUC+08h],1000000000/A_RATE
    mov   qword [rsp+.SOFF_TSTRUC],rax
@@ -106,11 +110,15 @@ main:
    mov   rdi,r14
    rep   movsw
 
+   %if D_EXPERIMENTAL
+   ;----------------;
    ; Initialize the camera angles and y-coordinate
    mov   byte [r13+Camera.y],    A_CAM_DEF_HEIGHT
    mov   word [r13+Camera.pitch],A_CAM_DEF_PITCH
    mov   word [r13+Camera.yaw],  A_CAM_DEF_YAW
    mov   word [r13+Camera.roll], A_CAM_DEF_ROLL
+   ;----------------;
+   %endif
 
    ; Display the watermark text and prepare the console
    PRINTSTR strWatermark,strWatermarkLen
@@ -135,6 +143,8 @@ main:
       ;==- Rendering code -==;
       
       ; Increment the camera's yaw and calculate the new x/z coords
+      %if D_EXPERIMENTAL
+      ;----------------;
       add   word [r13+Camera.yaw],A_CAM_YAW_INCREMENT
       mov   di,word [r13+Camera.yaw]
       call  cos
@@ -146,6 +156,8 @@ main:
       shr   eax,7
       sub   al,127
       mov   byte [r13+Camera.z],al
+      ;----------------;
+      %endif
 
       ; Scale down the smile
       mov   ecx,mSmile_VSize/2
@@ -165,7 +177,11 @@ main:
       ; Render the smile
       xor   r8d,r8d
       mov   rdi,r12
+      %if D_EXPERIMENTAL
+      ;----------------;
       mov   rsi,r13
+      ;----------------;
+      %endif
       mov   rdx,r14
       lea   rcx,[mSmile_IData]
       mov   r8b,mSmile_ICount-1
