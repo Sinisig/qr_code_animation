@@ -6,7 +6,6 @@
 %define  DRAW_S_IMPL
 %include "Shared.i"
 %include "draw.i"
-%include "math.i"
 
 
 section  .text
@@ -21,201 +20,31 @@ print_str: ; void print_str(const char * buf, u32 len)
    ret
 
 section  .text
-global   plot_triangle
-plot_triangle: ; void plot_triangle(char * buf, const Triangle2D * t, char fillColor)
-   push  rbx
-   push  rbp
-   push  r12
-   push  r13
-   push  r14
-   push  r15
-   dec   rsp
-
-   ; Set up registers
-   mov   byte [rsp],dl     ; [rsp] = fillColor
-   xor   eax,eax
-   mov   r14,rdi           ; r14 = buf
-   mov   al,4
-   mov   r8d,dword [rsi]
-   add   rsi,rax
-   mov   r9d,dword [rsi]
-   add   rsi,rax
-   mov   r10d,dword [rsi]  ; r8d = Triangle2D.a, r9d = Triangle2D.b, r10d = Triangle2D.c
-   xor   ebx,ebx
-   xor   r12d,r12d
-   xor   r13d,r13d
-   mov   r12b,C_SIZE_Y-1      ; y
-   mov   r13d,C_CHARCOUNT-2   ; i
-
-   ; Get the area of the full triangle
-   xor   ebx,ebx
-   mov   eax,r8d
-   mov   ecx,r9d
-   mov   edx,r10d
-   call  .tri_area
-   mov   ebp,ebx
-
-   .col_loop:
-      xor   r11d,r11d
-      mov   r11b,C_SIZE_X-1   ; x
-      .row_loop:
-      ; Get the area of the subtriangles
-      xor   ebx,ebx
-      mov   r15d,r12d
-      shl   r15d,16
-      or    r15d,r11d
-
-      ; p, a, b
-      mov   eax,r15d
-      mov   ecx,r8d
-      mov   edx,r9d
-      call  .tri_area
-
-      ; p, a, c
-      mov   eax,r15d
-      mov   ecx,r8d
-      mov   edx,r10d
-      call  .tri_area
-
-      ; p, b, c
-      mov   eax,r15d
-      mov   ecx,r9d
-      mov   edx,r10d
-      call  .tri_area
-
-      ; Is the area the same and non-zero?
-      test  ebx,ebx
-      jz    .skip_fill
-      cmp   ebp,ebx
-      jne   .skip_fill
-
-      ; Fill with the fill char
-      mov   al,byte [rsp]
-      mov   byte [r14+r13],al
-
-      ; Loop
-      .skip_fill:
-      dec   r13d
-      dec   r11d
-      jge   .row_loop
-   dec   r13d
-   dec   r12d
-   jge   .col_loop
-
-   inc   rsp
-   pop   r15
-   pop   r14
-   pop   r13
-   pop   r12
-   pop   rbp
-   pop   rbx
-   ret
-
-   .tri_area:
-   ; This isn't a separate callable function, just
-   ; a subroutine that's part of the plot_triangle function
-   ; 
-   ; eax = a
-   ; ebx = running area total
-   ; ecx = b
-   ; edx = c
-   ; Make sure to only modify these registers:
-   ; eax, ecx, edx, edi, esi
-   ; 
-   ; At the end, add the result to ebx
-   ; 
-   ; Formula for calculating area:
-   ; a = |x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2)|/2
-   ; 
-   ; Since this is only used for testing if a point
-   ; is bound by the triangle, the /2 part can be
-   ; skipped as it's not necessary to check for a
-   ; matching result.
-   
-   ; Temporary variables for the math
-   push  rbp
-   push  rbx
-
-   ;!!! Potential for integer overflow issues
-   ; due to the use of 16-bit multiplication.
-   ; It seems to be fine for now, but this might
-   ; lead to issues down the road with massive
-   ; triangles.
-
-   ; x1*(y2-y3)
-   mov   ebp,ecx
-   mov   esi,edx
-   shr   ebp,16
-   shr   esi,16
-   sub   bp,si
-   imul  bp,ax
-
-   ; x3*(y1-y2)
-   mov   edi,eax
-   mov   ebx,ecx
-   shr   edi,16
-   shr   ebx,16
-   sub   di,bx
-   imul  di,dx
-   add   bp,di
-
-   ; x2*(y3-y1)
-   shr   eax,16
-   sub   si,ax
-   imul  si,cx
-   add   bp,si
-   
-   ; Absolute value
-   jge   .skip_abs
-   not   bp
-   inc   bp
-
-   .skip_abs:
-   pop   rbx
-   add   ebx,ebp
-   pop   rbp
-   ret
-
-section  .text
-global   render_shape ; void render_shape(char * buf, const Camera * cam, const Point3D * vBuf, const u8 * iBuf, u32 iCount)
+global   render_shape ; u32 render_shape(char * buf, const Point2D * vBuf, const u8 * iBuf, u32 iCount)
 render_shape:
    ; This function takes in a list of vertices and
-   ; indexes into the vertex list to construct a shape.
+   ; indexes into the vertex list to construct a shape
+   ; and return the amount of filled in pixels.
    ; 
    ; A shape is created by loading in 3 indices from
    ; the index buffer, and using those as offsets into
-   ; the vertex buffer to form a triangle.
-   ;
-   ; Vertex positions are converted into screen coordinates
-   ; by multiplying x and y coordinates by their scale factor,
-   ; then adding half of C_SIZE_X/Y to the x/y coordinates.
-   ; 
-   ; In the future, this function will also run the projection
-   ; code to allow for 3D triangles.  The color will also depend
-   ; on the triangle's angle to the screen.
+   ; the vertex buffer to form a triangle.  That triangle
+   ; is then rendered into a character buffer expected to
+   ; be an empty rectangle of size C_SIZE_X by C_SIZE_Y.
 
-   %macro LOAD_VERTEX 1
-      call  .load_vertex
-      mov   %1,rax
-   %endmacro
+   .SBUF_VBUF        equ 8
+   .SBUF_BUF         equ 8
+   .SBUF_AREA_FULL   equ 2
+   .SBUF_AREA_PART   equ 2
 
-   %macro CONVERT_WORLD_COORD 1
-      mov   eax,%1
-      call  .convert_world_coord
-   %endmacro
-
-   .SBUF_DRAWTRI  equ 16
-   .SBUF_CAMERA   equ 8
-   .SBUF_VBUF     equ 8
-   .SBUF_BUF      equ 8
-
-   .STACKSZ       equ .SBUF_DRAWTRI+.SBUF_VBUF+.SBUF_BUF+8
-   .SOFF_DRAWTRI  equ 0
-   .SOFF_CAMERA   equ .SBUF_DRAWTRI
-   .SOFF_VBUF     equ .SOFF_CAMERA+.SBUF_CAMERA
-   .SOFF_BUF      equ .SOFF_VBUF+.SBUF_VBUF
+   .STACKSZ          equ .SBUF_VBUF+.SBUF_BUF+.SBUF_AREA_FULL+.SBUF_AREA_PART+12
+   .SOFF_VBUF        equ 0
+   .SOFF_BUF         equ .SOFF_VBUF+.SBUF_VBUF
+   .SOFF_AREA_FULL   equ .SOFF_BUF+.SBUF_BUF
+   .SOFF_AREA_PART   equ .SOFF_AREA_FULL+.SBUF_AREA_FULL
 
    push  rbx
+   push  rbp
    push  r12
    push  r13
    push  r14
@@ -223,74 +52,113 @@ render_shape:
    sub   rsp,.STACKSZ
 
    ; Initialize base registers and store data
-   mov   ebx,r8d                       ; iCount
-   mov   r12,rcx                       ; iBuf
-   mov   qword [rsp+.SOFF_VBUF],rdx    ; vBuf
-   mov   qword [rsp+.SOFF_CAMERA],rsi  ; cam
+   mov   ebx,ecx                       ; iCount
+   mov   r12,rdx                       ; iBuf
+   mov   qword [rsp+.SOFF_VBUF],rsi    ; vBuf
    mov   qword [rsp+.SOFF_BUF],rdi     ; buf
 
    .plot_loop:
-   ; Load in the next triangle
+   ; Load in the next triangle and convert to screen coords
    mov   rsi,qword [rsp+.SOFF_VBUF]
-   LOAD_VERTEX r13
-   LOAD_VERTEX r14
-   LOAD_VERTEX r15
+   call  .load_vertex
+   mov   r8d,ecx
+   call  .load_vertex
+   mov   r9d,ecx
+   call  .load_vertex
+   mov   r10d,ecx
 
-   ; TODO: Run the orthographic projection to get the
-   ; 2D world coordinates and get the angle of the
-   ; triangle to the camera to get the triangle shade
-   ; 
-   ; Another TODO: Once this is implemented, the triangles
-   ; need to be sorted from back to front in order to get
-   ; the proper rendering order.  Have fun implementing this
-   ; in ASM >:)
-   mov   r8d,r13d
-   mov   r9d,r14d
-   mov   r10d,r15d
-   mov   dl,C_FG_SHADE0
+   ; Plot the triangle on screen
+   ; This is done by looping for every screen pixel and
+   ; seeing if each point is contained inside of the triangle.
+   ; This is done by dividing up the main triangle into 3
+   ; sub-triangles and getting the area of them.  If the area
+   ; is the same as the original triangle, the point is bound.
 
-   ; Convert form world coords to screen coords and store the result
-   lea   rdi,[rsp+.SOFF_DRAWTRI]
-   CONVERT_WORLD_COORD r8d
-   CONVERT_WORLD_COORD r9d
-   CONVERT_WORLD_COORD r10d
+   ; Get the area of the original triangle
+   mov   eax,r8d
+   mov   ecx,r9d
+   mov   edx,r10d
+   call  .tri_area
+   mov   word [rsp+.SOFF_AREA_FULL],ax
 
-   ; Print the triangle and loop
-   mov   rdi,qword [rsp+.SOFF_BUF]
-   lea   rsi,[rsp+.SOFF_DRAWTRI]
-   call  plot_triangle
-   xor   eax,eax
-   mov   al,3
-   .skip_plot:
-   sub   ebx,eax
+   mov   r14b,C_SIZE_Y-1      ; y
+   mov   r15d,C_CHARCOUNT-2   ; i
+   .render_loop_col:
+      mov   r13b,C_SIZE_X-1   ; x
+      .render_loop_row:
+      ; Combine x and y into the point (x,y)
+      movzx ebp,r14b
+      shl   ebp,16
+      movzx bp,r13b
+
+      ; Form 3 sub-triangles using (x,y) and get
+      ; their areas
+      
+      ; p1, p2, ps
+      mov   eax,r8d
+      mov   ecx,r9d
+      mov   edx,ebp
+      call  .tri_area
+      mov   word [rsp+.SOFF_AREA_PART],ax
+
+      ; p1, ps, p3
+      mov   eax,r8d
+      mov   ecx,ebp
+      mov   edx,r10d
+      call  .tri_area
+      add   word [rsp+.SOFF_AREA_PART],ax
+
+      ; ps, p2, p3
+      mov   eax,ebp
+      mov   ecx,r9d
+      mov   edx,r10d
+      call  .tri_area
+      add   ax,word [rsp+.SOFF_AREA_PART]
+
+      ; Is the area non-zero and the same as the
+      ; original triangle?
+      jz    .not_bound
+      cmp   ax,word [rsp+.SOFF_AREA_FULL]
+      jne   .not_bound
+
+      ; Fill in the pixel
+      mov   rax,qword [rsp+.SOFF_BUF]
+      mov   byte [rax+r15],C_FG_SHADE0
+
+      ; Looping code
+      .not_bound:
+      dec   r15d
+      dec   r13b
+      jge   .render_loop_row
+   dec   r15d
+   dec   r14b
+   jge   .render_loop_col
+
+   ; Draw the next triangle
+   dec   ebx
    jge   .plot_loop
 
+   ; Wrap up and return
    add   rsp,.STACKSZ
    pop   r15
    pop   r14
    pop   r13
    pop   r12
+   pop   rbp
    pop   rbx
    ret
 
    .load_vertex:
    ; Subroutine that loads in a vertex and increments the pointer
+   ; It also converts the loaded vertex to screen coordinates
    ; rsi = Pointer to the vBuf
-   ; Output is in rax
+   ; ecx = Output vertex
+   ; r12 = Current IB pointer
+   
+   ; Load the vertex
    movzx eax,byte [r12]
    inc   r12
-   lea   rcx,[rax+rax*4]
-   add   rcx,rax  ; offset*6
-   mov   dx,word [rsi+rcx+4]
-   mov   eax,dword [rsi+rcx]
-   shl   rdx,32
-   or    rax,rdx
-   ret
-
-   .convert_world_coord:
-   ; Subroutine that converts an input Point2D to screen coordinates and stores the result
-   ; eax = input
-   ; rdi = output pointer
+   mov   eax,dword [rsi+rax*4]
    mov   ecx,eax
    shr   ecx,16
    
@@ -319,8 +187,53 @@ render_shape:
    ; Store the result and increment the pointer
    shl   ecx,16
    mov   cx,ax
-   xor   eax,eax
-   mov   dword [rdi],ecx
-   mov   al,4
-   add   rdi,rax
+   ret
+
+   .tri_area:
+   ; Subroutine that calculates the area of a given Triangle2D
+   ; 
+   ; Input registers:
+   ;  eax - Point 1
+   ;  ecx - Point 2
+   ;  edx - Point 3
+   ; 
+   ; Output is in eax
+   ; 
+   ; Formula for calculating area * 2:
+   ; a = |x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2)|
+
+   push  rbp
+   push  rbx
+
+   ; Load y1, y2, y3
+   mov   ebp,eax
+   mov   edi,ecx
+   mov   esi,edx
+   shr   ebp,16
+   shr   edi,16
+   shr   esi,16
+
+   ; x3*(y1-y2)
+   mov   bx,bp
+   sub   bx,di
+   imul  dx,bx
+
+   ; x1*(y2-y3)
+   sub   di,si
+   imul  ax,di
+
+   ; x2*(y3-y1)
+   sub   si,bp
+   imul  cx,si
+
+   ; Add together and absolute value
+   add   ax,cx
+   add   ax,dx
+   jge   .no_abs
+   not   eax   ; 32-bit versions save 2 bytes
+   inc   eax
+
+   .no_abs:
+   pop   rbx
+   pop   rbp
    ret

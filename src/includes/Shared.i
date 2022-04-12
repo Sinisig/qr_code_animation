@@ -8,9 +8,9 @@ segment  flat
 bits     64
 
 ; Syscall IDs
-SYS_EXIT        equ 3Ch
-SYS_WRITE       equ 01h
-SYS_NANOSLEEP   equ 23h
+SYS_EXIT    equ 3Ch
+SYS_WRITE   equ 01h
+SYS_USLEEP  equ 23h
 
 ; Output Stream File Descriptors
 STDOUT      equ 00h
@@ -38,15 +38,6 @@ C_FG_SHADE_COUNT    equ 5
 ; Animation Parameters
 A_LENGTH equ 300  ; Frame count
 A_RATE   equ 30   ; Frame rate (fps)
-
-A_CAM_DEF_PITCH     equ 28672   ; Default camera pitch
-A_CAM_DEF_YAW       equ 0       ; Default camera yaw
-A_CAM_DEF_ROLL      equ 0       ; Default camera roll
-A_CAM_DEF_HEIGHT    equ 128     ; Default camera height
-A_CAM_YAW_INCREMENT equ 1092    ; Rotation amount per frame
-
-; Should we include new, experimental code?
-%define D_EXPERIMENTAL   0
 
 ;--------------;
 %endif
