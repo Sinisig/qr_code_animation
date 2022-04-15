@@ -20,11 +20,10 @@ print_str: ; void print_str(const char * buf, u32 len)
    ret
 
 section  .text
-global   render_shape ; u32 render_shape(char * buf, const Point2D * vBuf, const u8 * iBuf, u32 iCount)
+global   render_shape ; void render_shape(char * buf, const Point2D * vBuf, const u8 * iBuf, u32 iCount)
 render_shape:
    ; This function takes in a list of vertices and
-   ; indexes into the vertex list to construct a shape
-   ; and return the amount of filled in pixels.
+   ; indexes into the vertex list to construct a shape.
    ; 
    ; A shape is created by loading in 3 indices from
    ; the index buffer, and using those as offsets into
@@ -32,16 +31,14 @@ render_shape:
    ; is then rendered into a character buffer expected to
    ; be an empty rectangle of size C_SIZE_X by C_SIZE_Y.
 
-   .SBUF_VBUF        equ 8
-   .SBUF_BUF         equ 8
-   .SBUF_AREA_FULL   equ 2
-   .SBUF_AREA_PART   equ 2
+   .SBUF_VBUF     equ 8
+   .SBUF_BUF      equ 8
+   .SBUF_TRI_AREA equ 2
 
-   .STACKSZ          equ .SBUF_VBUF+.SBUF_BUF+.SBUF_AREA_FULL+.SBUF_AREA_PART+12
+   .STACKSZ          equ .SBUF_VBUF+.SBUF_BUF+.SBUF_TRI_AREA+14
    .SOFF_VBUF        equ 0
    .SOFF_BUF         equ .SOFF_VBUF+.SBUF_VBUF
-   .SOFF_AREA_FULL   equ .SOFF_BUF+.SBUF_BUF
-   .SOFF_AREA_PART   equ .SOFF_AREA_FULL+.SBUF_AREA_FULL
+   .SOFF_TRI_AREA    equ .SOFF_BUF+.SBUF_BUF
 
    push  rbx
    push  rbp
@@ -52,7 +49,7 @@ render_shape:
    sub   rsp,.STACKSZ
 
    ; Initialize base registers and store data
-   mov   ebx,ecx                       ; iCount
+   mov   r11d,ecx                      ; iCount
    mov   r12,rdx                       ; iBuf
    mov   qword [rsp+.SOFF_VBUF],rsi    ; vBuf
    mov   qword [rsp+.SOFF_BUF],rdi     ; buf
@@ -79,7 +76,7 @@ render_shape:
    mov   ecx,r9d
    mov   edx,r10d
    call  .tri_area
-   mov   word [rsp+.SOFF_AREA_FULL],ax
+   mov   word [rsp+.SOFF_TRI_AREA],ax
 
    mov   r14b,C_SIZE_Y-1      ; y
    mov   r15d,C_CHARCOUNT-2   ; i
@@ -87,9 +84,9 @@ render_shape:
       mov   r13b,C_SIZE_X-1   ; x
       .render_loop_row:
       ; Combine x and y into the point (x,y)
-      movzx ebp,r14b
-      shl   ebp,16
-      movzx bp,r13b
+      movzx ebx,r14b
+      shl   ebx,16
+      mov   bl,r13b
 
       ; Form 3 sub-triangles using (x,y) and get
       ; their areas
@@ -97,28 +94,28 @@ render_shape:
       ; p1, p2, ps
       mov   eax,r8d
       mov   ecx,r9d
-      mov   edx,ebp
+      mov   edx,ebx
       call  .tri_area
-      mov   word [rsp+.SOFF_AREA_PART],ax
+      mov   ebp,eax
 
       ; p1, ps, p3
       mov   eax,r8d
-      mov   ecx,ebp
+      mov   ecx,ebx
       mov   edx,r10d
       call  .tri_area
-      add   word [rsp+.SOFF_AREA_PART],ax
+      add   ebp,eax
 
       ; ps, p2, p3
-      mov   eax,ebp
+      mov   eax,ebx
       mov   ecx,r9d
       mov   edx,r10d
       call  .tri_area
-      add   ax,word [rsp+.SOFF_AREA_PART]
+      add   ax,bp ; 16-bit for implicit zero-compare
 
       ; Is the area non-zero and the same as the
       ; original triangle?
       jz    .not_bound
-      cmp   ax,word [rsp+.SOFF_AREA_FULL]
+      cmp   ax,word [rsp+.SOFF_TRI_AREA]
       jne   .not_bound
 
       ; Fill in the pixel
@@ -135,7 +132,7 @@ render_shape:
    jge   .render_loop_col
 
    ; Draw the next triangle
-   dec   ebx
+   dec   r11d
    jge   .plot_loop
 
    ; Wrap up and return
@@ -201,7 +198,12 @@ render_shape:
    ; 
    ; Formula for calculating area * 2:
    ; a = |x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2)|
-
+   ; 
+   ; It's worth noting that 32-bit and 16-bit register
+   ; widths are used interchangably.  This is because
+   ; 32-bit widths save one byte in the encoding, so they
+   ; are used when possible.
+   
    push  rbp
    push  rbx
 
@@ -214,23 +216,23 @@ render_shape:
    shr   esi,16
 
    ; x3*(y1-y2)
-   mov   bx,bp
-   sub   bx,di
+   mov   ebx,ebp
+   sub   ebx,edi
    imul  dx,bx
 
    ; x1*(y2-y3)
-   sub   di,si
+   sub   edi,esi
    imul  ax,di
 
    ; x2*(y3-y1)
-   sub   si,bp
+   sub   esi,ebp
    imul  cx,si
 
    ; Add together and absolute value
-   add   ax,cx
-   add   ax,dx
+   add   eax,ecx
+   add   ax,dx ; 16-bit for implicit zero-compare
    jge   .no_abs
-   not   eax   ; 32-bit versions save 2 bytes
+   not   eax
    inc   eax
 
    .no_abs:
